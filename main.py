@@ -26,6 +26,10 @@ def pre(x):
 def post(x):
     return x * (DATA_MAX_INTENSITY - DATA_MIN_INTENSITY) + DATA_MIN_INTENSITY
 
+def check_dir(p):
+    if not os.path.isdir(p):
+        os.makedirs(p)
+
 def get_model_name(p):
     file_names = glob.glob(os.path.join(p, "model*.pt"))
     return file_names[-1]
@@ -177,17 +181,17 @@ def model_train(args, model, optimizer):
 
                         print("save model")
                         torch.save(
-                            model.state_dict(), f'checkpoint/model_{str(i + 1).zfill(5)}.pt'
+                            model.state_dict(), os.path.join(args.ckpt, f'model_{str(i + 1).zfill(5)}.pt')
                         )
                         torch.save(
-                            optimizer.state_dict(), f'checkpoint/optim_{str(i + 1).zfill(5)}.pt'
+                            optimizer.state_dict(), os.path.join(args.ckpt, f'optim_{str(i + 1).zfill(5)}.pt')
                         )
 
             if (i + 1) % 10 == 0 or i == 0:
                 with torch.no_grad():
                     utils.save_image(
                         model_single.reverse(z_sample).cpu().data[:, :, 4, :, :],
-                        f'sample/{str(i + 1).zfill(5)}.png',
+                        os.path.join(args.sample, f'{str(i + 1).zfill(5)}.png'),
                         normalize=False,
                         nrow=10,
                         range=(0.0, 1.0),
@@ -229,11 +233,16 @@ def model_test(args, model):
 def main(args, model):
 
     if args.mode == "train":
+        check_dir(args.ckpt)
+        check_dir(args.sample)
+
         optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
         model_train(args, model, optimizer)
 
     else:
+        check_dir(args.output)
+
         na = get_model_name(args.ckpt)
         model.load_state_dict(torch.load(na))
         model_test(args, model)
@@ -242,8 +251,8 @@ def main(args, model):
 
 def arg_parser():
     parser = argparse.ArgumentParser(description='Glow trainer')
-    parser.add_argument('--batch', default=256, type=int, help='batch size')
-    parser.add_argument('--batch_init', default=512, type=int, help='initial batch size')
+    parser.add_argument('--batch', default=128, type=int, help='batch size')
+    parser.add_argument('--batch_init', default=256, type=int, help='initial batch size')
     parser.add_argument('--epochs', default=1000, type=int, help='maximum epochs')
 
     parser.add_argument(
@@ -261,12 +270,14 @@ def arg_parser():
     )
     parser.add_argument('--n_bits', default=5, type=int, help='number of bits') # float32 -> 5
     parser.add_argument('--lr', default=1e-4, type=float, help='learning rate')
-    parser.add_argument('--img_size', default=8, type=int, help='image size')
+    parser.add_argument('--img_size', default=32, type=int, help='image size')
     parser.add_argument('--img_ch', default=1, type=int, help='image channel') # RGB -> 3, Gray -> 1
     parser.add_argument('--temp', default=0.7, type=float, help='temperature of sampling')
     parser.add_argument('--n_sample', default=100, type=int, help='number of samples')
-    parser.add_argument('--path', default='./np_record2/', type=str, help='Path to image directory')
+    parser.add_argument('--path', default='D:/oosky/SIMs/data_CT/np_record2/', type=str, help='Path to image directory')
     parser.add_argument('--ckpt', default='./checkpoint/', type=str, help='Path to checkpoint directory')
+    parser.add_argument('--sample', default='./sample/', type=str, help='Path to sample image directory')
+    parser.add_argument('--output', default='./npy/', type=str, help='Path to test image(.npy) directory')
     parser.add_argument('--mode', default='train', type=str, help='[train, test]')
 
     args = parser.parse_args()
